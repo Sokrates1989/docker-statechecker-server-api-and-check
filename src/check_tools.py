@@ -4,9 +4,6 @@
 import telebot
 import time
 
-# To get config json.
-import json
-
 # Be able to write trace to logfile.
 import traceback
 
@@ -14,21 +11,21 @@ import traceback
 # Insert path to utils to allow importing them.
 import os
 import sys
-
 sys.path.insert(1, os.path.join(os.path.dirname(__file__), "utils"))
 sys.path.insert(1, os.path.join(os.path.dirname(__file__), "models"))
-import logger as Logger
-import databaseWrapper as DatabaseWrapper
-# Utils for getting state of tools.
+sys.path.insert(1, os.path.join(os.path.dirname(__file__), "definitions"))
+
+# Own Utils, classes and other imports.
 import stateCheckUtils
 import stringUtils
+import logger as Logger
+import databaseWrapper as DatabaseWrapper
+import configUtils as ConfigUtils
 
 ## Initialize vars.
 
 # Get config.
-config_file_pathAndName = os.path.join(os.path.dirname(__file__), "..", "config.txt")
-config_file = open(config_file_pathAndName)
-config_array = json.load(config_file)
+configUtils = ConfigUtils.ConfigUtils()
 
 # Instantiate classes.
 # Database connection.
@@ -37,36 +34,39 @@ dbWrapper = DatabaseWrapper.DatabaseWrapper()
 logger = Logger.Logger("check_tools")
 
 # Initialize bots.
-botToken = config_array["telegram"]["botToken"]
+botToken = configUtils.getTelegramBotToken()
 bot = telebot.TeleBot(botToken, parse_mode="HTML")
-errorChatID = config_array["telegram"]["errorChatID"]
-infoChatID = config_array["telegram"]["infoChatID"]
+errorChatIDs = configUtils.getTelegramErrorChatsIDs()
+infoChatIDs = configUtils.getTelegramInfoChatsIDs()
 
 
 # Handles error exceptions (log and info to admin).
 def handleCommandException(exceptionLocationAndAdditionalInformation, exception):
     # Log error.
     errorLogText = exceptionLocationAndAdditionalInformation + " " + str(exception)
+
     # Add traceback to logfile.
     traceOfError = traceback.format_exc()
     logger.logError(str(traceOfError) + "\n" + errorLogText)
 
     # Send error message to admin telegram chat, if intended.
-    bot = telebot.TeleBot(botToken, parse_mode="HTML")
-    bot.send_message(errorChatID, errorLogText)
+    if configUtils.areTelegramStatusMessagesEnabled():
+        bot = telebot.TeleBot(botToken, parse_mode="HTML")
+        for errorChatID in errorChatIDs:
+            bot.send_message(errorChatID, errorLogText)
 
 
-# Info, that checking schedule is still taking place (log and info to admin).
-def infoCheckingToolsIsWorking(justStartedChecking=False):
+# Info, that checking schedule is still taking place (log and info).
+def infoCheckingToolsIsWorking(justStartedChecking=False, telegramTimeReached=False, emailTimeReached=False):
     # Create info text.
     infoLogText = "<b><u>Tools are being checked.</u></b>\nWebsites are being checked every <b>" + str(
         checkWebsitesEveryXMinutes) + "</b> minutes"
     if justStartedChecking:
         infoLogText += "\nJust (re-)started checking tools.\n\nAbout every " + str(
-            adminMessageEvery_desiredMinutes) + " minutes a status message should be send, to verify that this program is still working correctly."
+            telegramMessageEvery_desiredMinutes) + " minutes a status message should be send, to verify that this program is still working correctly."
     else:
         infoLogText += "\n\nThis is an information to ensure, that the program is working correctly.\n\nThis message should show up again in " + str(
-            adminMessageEvery_desiredMinutes) + " minutes, verifying that this program is still working correctly."
+            telegramMessageEvery_desiredMinutes) + " minutes, verifying that this program is still working correctly."
     infoLogText += "\nIf not -> Try to restart this program and take a look at the logs."
 
     # Add status message of checked tools.
@@ -75,23 +75,26 @@ def infoCheckingToolsIsWorking(justStartedChecking=False):
     # Log information.
     logger.logInformation(infoLogText)
 
-    # Send message to admin telegram chat.
-    # Does message have to be split?
-    if len(infoLogText) > 4096:
+    # Send message to admin telegram chat, if enabled and time reached.
+    if configUtils.areTelegramStatusMessagesEnabled() and (justStartedChecking or telegramTimeReached):
 
-        # Split message.
-        individualMessages = stringUtils.splitLongTextIntoWorkingMessages(infoLogText)
+        # Does message have to be split?
+        if len(infoLogText) > 4096:
 
-        # Send messages.
-        bot = telebot.TeleBot(botToken, parse_mode="HTML")
-        for individualMessage in individualMessages:
-            bot.send_message(infoChatID, individualMessage)
+            # Split message.
+            individualMessages = stringUtils.splitLongTextIntoWorkingMessages(infoLogText)
 
+            # Send messages.
+            bot = telebot.TeleBot(botToken, parse_mode="HTML")
+            for individualMessage in individualMessages:
+                for infoChatID in infoChatIDs:
+                    bot.send_message(infoChatID, individualMessage)
 
-    else:
-        # Message does not have to be split.
-        bot = telebot.TeleBot(botToken, parse_mode="HTML")
-        bot.send_message(infoChatID, infoLogText)
+        else:
+            # Message does not have to be split.
+            bot = telebot.TeleBot(botToken, parse_mode="HTML")
+            for infoChatID in infoChatIDs:
+                bot.send_message(infoChatID, infoLogText)
 
 
 ## Check whether a scheduled countdown has to be sent.
@@ -100,19 +103,18 @@ def infoCheckingToolsIsWorking(justStartedChecking=False):
 printEvery = 100
 
 # Status message to admin chat, that tool is up.
-adminMessageEvery_desiredMinutes = int(config_array["telegram"]["adminStatusMessage_everyXMinutes"])
-adminMessageEvery_offsetPercentageCalculatingProcessionTime = float(
-    config_array["telegram"]["adminStatusMessage_operationTime_offsetPercentage"])
-adminMessageEvery_calculatedOffset = int(adminMessageEvery_desiredMinutes - (
-            adminMessageEvery_desiredMinutes * adminMessageEvery_offsetPercentageCalculatingProcessionTime / 100))
+telegramMessageEvery_desiredMinutes = configUtils.getTelegramStatusMessagesEveryXMinutes()
+adminMessageEvery_offsetPercentageCalculatingProcessionTime = configUtils.getStatusMessagesTimeOffsetPercentage()
+telegramMessageEvery_calculatedOffset = int(telegramMessageEvery_desiredMinutes - (
+            telegramMessageEvery_desiredMinutes * adminMessageEvery_offsetPercentageCalculatingProcessionTime / 100))
 # Avoid zero devision error.
-if adminMessageEvery_calculatedOffset == 0:
-    adminMessageEvery_calculatedOffset = 1
+if telegramMessageEvery_calculatedOffset == 0:
+    telegramMessageEvery_calculatedOffset = 1
 
 # How often to check websiteStates.
-checkWebsitesEveryXMinutes = int(config_array["websites"]["checkWebSitesEveryXMinutes"])
+checkWebsitesEveryXMinutes = configUtils.getWebsiteChecksEveryXMinutes()
 # How often to check google drive backups.
-checkGoogleDriveEveryXMinutes = int(config_array["googleDrive"]["checkFilesEveryXMinutes"])
+checkGoogleDriveEveryXMinutes = configUtils.getGoogleDriveChecksEveryXMinutes()
 
 i = 0
 print("checking ...")
@@ -163,7 +165,8 @@ while True:
 
                     # Indicate, that tool is down message has been sent.
                     if toolStateItem.isCustomCheck == True:
-                        stateCheckUtils.writeMessageHasBeenSentStateToFile(toolStateItem, "Down")
+                        dbWrapper.updateWebsiteState(toolStateItem.name, "Down")
+                        dbWrapper.updateWebsiteIsDownMessageHasBeenSentState(toolStateItem.name, 1)
                     elif toolStateItem.isBackupCheck == True:
                         # Indicate to DB, that message has been sent.
                         dbWrapper.updateBackupIsDownMessageHasBeenSentState(toolStateItem.name, 1)
@@ -177,15 +180,20 @@ while True:
                         toolStateItem.description)
                     toolStateItemIsDownMsg += "" if toolStateItem.statusMessage == "" or toolStateItem.statusMessage == "OK" else "\n" + str(
                         toolStateItem.statusMessage)
-                    bot = telebot.TeleBot(botToken, parse_mode="HTML")
-                    bot.send_message(errorChatID, toolStateItemIsDownMsg)
+                    
+                    # Send message to admin telegram chat, if enabled.
+                    if configUtils.areTelegramStatusMessagesEnabled():
+                        bot = telebot.TeleBot(botToken, parse_mode="HTML")
+                        for errorChatID in errorChatIDs:
+                            bot.send_message(errorChatID, toolStateItemIsDownMsg)
+                    
 
 
             else:
 
                 # Tool is up.
 
-                # Has there been an error message before ?
+                # Has there been an error cleared message already ?
                 if toolStateItem.toolIsDownMessageHasBeenSent == True:
 
                     # There has been an error message recently.
@@ -196,7 +204,8 @@ while True:
 
                     # Indicate, that tool is up message has been sent.
                     if toolStateItem.isCustomCheck == True:
-                        stateCheckUtils.writeMessageHasBeenSentStateToFile(toolStateItem, "Up")
+                        dbWrapper.updateWebsiteState(toolStateItem.name, "Up")
+                        dbWrapper.updateWebsiteIsDownMessageHasBeenSentState(toolStateItem.name, 0)
                     elif toolStateItem.isBackupCheck == True:
                         # Indicate to DB, that message has been sent.
                         dbWrapper.updateBackupIsDownMessageHasBeenSentState(toolStateItem.name, 0)
@@ -211,12 +220,16 @@ while True:
                         toolStateItem.description)
                     toolStateItemIsUpAgainMsg += "" if toolStateItem.statusMessage == "" or toolStateItem.statusMessage == "OK" else "\n" + str(
                         toolStateItem.statusMessage)
-                    bot = telebot.TeleBot(botToken, parse_mode="HTML")
-                    bot.send_message(errorChatID, toolStateItemIsUpAgainMsg)
+                    
+                    # Send message to admin telegram chat, if enabled.
+                    if configUtils.areTelegramStatusMessagesEnabled():
+                        bot = telebot.TeleBot(botToken, parse_mode="HTML")
+                        for errorChatID in errorChatIDs:
+                            bot.send_message(errorChatID, toolStateItemIsUpAgainMsg)
 
         # Send message to admin chat.
-        if (i % adminMessageEvery_calculatedOffset == 0):
-            infoCheckingToolsIsWorking()
+        if (i % telegramMessageEvery_calculatedOffset == 0):
+            infoCheckingToolsIsWorking(telegramTimeReached=True)
 
         # Sleep 60 seconds.
         time.sleep(60)

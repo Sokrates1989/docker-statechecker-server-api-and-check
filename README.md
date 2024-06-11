@@ -1,5 +1,47 @@
-# stateChecker
-Check if your created tools and websites are running correctly and send a telegram message if not
+# statechecker-server-api-and-check
+Combined repo for both statechecker-server-check and statechecker-server-api-and-check
 
-## Allowing commands on host OS
-https://stackoverflow.com/questions/32163955/how-to-run-shell-script-on-host-from-docker-container
+To deploy use https://github.com/Sokrates1989/swarm-statechecker-server.git
+
+# Backlog
+Stuff to do, that just could not be done in time
+- Server auth token
+- Timezone
+- Log and print via telegram and email as well
+- google drive folders as secret json instead of .env statechecker config json
+
+
+# Push API to dockerhub
+
+```bash
+docker image ls sokrates1989/statechecker-server-api-and-check
+```
+
+```bash
+docker build -t statechecker-server-api-and-check .
+docker tag statechecker-server-api-and-check sokrates1989/statechecker-server-api-and-check:latest
+docker tag statechecker-server-api-and-check sokrates1989/statechecker-server-api-and-check:major.minor.patch
+docker login
+docker push sokrates1989/statechecker-server-api-and-check:latest
+docker push sokrates1989/statechecker-server-api-and-check:major.minor.patch
+```
+
+
+## Debug images
+
+### Create
+
+```bash
+docker build -t statechecker-server-api-and-check .
+docker tag statechecker-server-api-and-check sokrates1989/statechecker-server-api-and-check:DEBUG-major.minor.patch
+docker login
+docker push sokrates1989/statechecker-server-api-and-check:DEBUG-major.minor.patch
+docker image ls sokrates1989/statechecker-server-api-and-check
+git status
+
+```
+### Cleanup / Delete
+```bash
+docker rmi sokrates1989/statechecker-server-api-and-check:DEBUG-major.minor.patch
+```
+

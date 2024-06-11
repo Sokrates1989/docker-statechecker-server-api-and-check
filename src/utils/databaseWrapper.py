@@ -17,6 +17,7 @@ import os
 import sys
 sys.path.insert(1, os.path.join(os.path.dirname(__file__), "..", "utils"))
 sys.path.insert(1, os.path.join(os.path.dirname(__file__), "..", "models"))
+sys.path.insert(1, os.path.join(os.path.dirname(__file__), "..", "definitions"))
 
 # StateCheckItem from own models to use location independent.
 import stateCheckItem as StateCheckItem
@@ -24,24 +25,28 @@ import stateCheckItem as StateCheckItem
 # BackupCheckItem from own models to use location independent.
 import backupCheckItem as BackupCheckItem
 
+# WebsiteState item from own models to use location independent.
+import websiteStateAndMessageSentItem as WebsiteStateAndMessageSentItem
+
+# Get configuration settings.
+import configUtils as ConfigUtils
+
 
 class DatabaseWrapper:
 
 	# Constructor.
 	def __init__(self):
 
-		# Get credentials for database from config file.
-		config_file_pathAndName = os.path.join(os.path.dirname(__file__), "..", "..", "config.txt")
-		config_file = open(config_file_pathAndName)
-		config_array = json.load(config_file)
+		# Get connection to database.
+		configUtils = ConfigUtils.ConfigUtils()
 
 		# Database connection
 		self.mydb = mysql.connector.connect(
-			host=config_array["database"]["host"],
-			user=config_array["database"]["user"],
-			password=config_array["database"]["password"],
-			database=config_array["database"]["database"],
-			port=config_array["database"]["port"]
+			host=configUtils.getDatabaseHost(),
+			user=configUtils.getDatabaseUser(),
+			password=configUtils.getDatabasePassword(),
+			database=configUtils.getDatabaseName(),
+			port=3306
 		)
 		self.mycursor = self.mydb.cursor(buffered=True) # need to buffer to fix mysql.connector.errors.InternalError: Unread result found (https://stackoverflow.com/questions/29772337/python-mysql-connector-unread-result-found-when-using-fetchone)
 
@@ -390,3 +395,92 @@ class DatabaseWrapper:
 			toolToCheck = self.getBackupCheckItemByName(result[0])
 			toolsToCheck.append(toolToCheck)
 		return toolsToCheck
+
+
+
+
+
+	# Get WebsiteCheckItem by its name.
+	# Pass name as parameter.
+	# Return is WebsiteStateAndMessageSentItem.
+	def getWebsiteCheckItemByName(self, name):
+		query = "SELECT ID, name, state, isDownMessageHasBeenSent FROM checked_websites WHERE name=%s "
+		val = (name, )
+		self.mycursor.execute(query, val)
+		myresult = self.mycursor.fetchone()
+
+		# Did query retrieve valid websiteCheckItem?
+		websiteCheckItem = None
+		if (myresult != None):
+
+			websiteCheckItemHelper = {
+				'ID': myresult[0],
+				'name': myresult[1],
+				'state': myresult[2],
+				'isDownMessageHasBeenSent': myresult[3]
+			}
+
+			websiteCheckItem = WebsiteStateAndMessageSentItem.WebsiteStateAndMessageSentItem(
+				websiteCheckItemHelper["name"],
+				websiteCheckItemHelper["state"],
+				websiteCheckItemHelper["isDownMessageHasBeenSent"]
+			)
+		return websiteCheckItem
+
+
+	# Create a new stateCheck.
+	# Pass websiteCheckItem as parameter.
+	def createNewWebsiteCheck(self, websiteCheckItemToCreate):
+
+		# Does item already exist?
+		websiteCheckItem = self.getWebsiteCheckItemByName(websiteCheckItemToCreate.name)
+		if websiteCheckItem == None:
+
+			# Create new website to check state of.
+			# Execute insert query to create a new website check item.
+			insertSql = "INSERT INTO checked_websites (name, state, isDownMessageHasBeenSent) VALUES (%s, %s, %s)"
+			val = (websiteCheckItemToCreate.name, websiteCheckItemToCreate.state, websiteCheckItemToCreate.isDownMessageHasBeenSent)
+			self.mycursor.execute(insertSql, val)
+			self.mydb.commit()
+
+			# Return newly created user.
+			return self.getWebsiteCheckItemByName(websiteCheckItemToCreate.name)
+		else:
+			# Item already exists -> do nothing and return None.
+			return None
+
+
+
+	# Update website state.
+	def updateWebsiteState(self, websiteName, newState):
+
+		# Check if the token is the same.
+		sql = "UPDATE checked_websites SET state = %s WHERE name = %s"
+		val = (
+			newState, 
+			websiteName
+		)
+
+		# Execute query.
+		self.mycursor.execute(sql, val)
+		self.mydb.commit()
+
+
+
+	# Update state of websiteIsDownMessageHasBeenSent.
+	# Pass websiteCheckItemName and new state as parameter.
+	def updateWebsiteIsDownMessageHasBeenSentState(self, websiteCheckItemName, newWebsiteIsDownMessageHasBeenSentState):
+
+		# Get the websiteCheckItem.
+		websiteCheckItem = self.getWebsiteCheckItemByName(websiteCheckItemName)
+
+		sql = "UPDATE checked_websites SET isDownMessageHasBeenSent = %s WHERE name = %s"
+		val = (newWebsiteIsDownMessageHasBeenSentState, websiteCheckItem.name)
+
+		# Execute query.
+		self.mycursor.execute(sql, val)
+		self.mydb.commit()
+
+		# Return updated item.
+		return self.getWebsiteCheckItemByName(websiteCheckItem.name)
+

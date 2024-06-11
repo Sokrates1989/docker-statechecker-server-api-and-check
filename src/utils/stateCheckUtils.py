@@ -3,7 +3,6 @@
 # For accessing google drive.
 from __future__ import print_function
 from googleapiclient.discovery import build
-from oauth2client.service_account import ServiceAccountCredentials
 
 # For getting current timestamp.
 import time
@@ -11,8 +10,6 @@ import time
 import requests
 # For file operations with operating system.
 import os
-# For getting config.
-import json
 # For creating files.
 import fileUtils
 
@@ -28,14 +25,14 @@ import toolStateItem as ToolStateItem
 import backupCheckItem as BackupCheckItem
 # Website State and Message sent state.
 import websiteStateAndMessageSentItem as WebsiteStateAndMessageSentItem
+# Logger.
+import logger as Logger
+# Get configuration settings.
+import configUtils as ConfigUtils
+configUtils = ConfigUtils.ConfigUtils()
 
 # Path to messageSentStates of custom checks.
 messageSentStatesDirectory = os.path.join(os.path.dirname(__file__), "..", "..", "messageSentStates/")
-
-# Config file.
-config_file_pathAndName = os.path.join(os.path.dirname(__file__), "..", "..", "config.txt")
-config_file = open(config_file_pathAndName)
-config_array = json.load(config_file)
 
 
 # Get states of tools that are being checked by sending their own alive message to api.
@@ -54,8 +51,7 @@ def getToolStates_api():
         for toolToCheck in allToolsToCheck:
 
             # Has the state info been sent within the desired amount of time?
-            if int(toolToCheck.lastTimeToolWasUp) + int(toolToCheck.stateCheckFrequency_inMinutes) * 60 + int(
-                    config_array["toolsUsingApi_tolerancePeriod_inSeconds"]) < now:
+            if int(toolToCheck.lastTimeToolWasUp) + int(toolToCheck.stateCheckFrequency_inMinutes) * 60 + configUtils.getTolerencePeriodInSeconds() < now:
 
                 # No valid state check withing desired timespan.
 
@@ -138,22 +134,18 @@ def getToolStates_websites():
     # Array of ToolStateItems.
     toolStateItems = []
 
+    # Database connection.
+    dbWrapper = DatabaseWrapper.DatabaseWrapper()
+
     # Check all website urls.
-    urls = config_array["websites"]["websitesToCheck"]
+    urls = configUtils.getWebsitesToCheck()
     for url in urls:
 
-        # Check website states.
-        fileNameForMessageSentState = fileUtils.getValidFileNameForString(url, "txt")
-        messageSentStateFile = os.path.join(messageSentStatesDirectory, fileNameForMessageSentState)
-        fileUtils.createFileIfNotExists(messageSentStateFile)
+        # Create website item in db if not exists.
+        dbWrapper.createNewWebsiteCheck(WebsiteStateAndMessageSentItem.WebsiteStateAndMessageSentItem(url, "Up", False))
 
-        # Get previous state of tool and state of message.
-        websiteStateAndMessageSentStateJson = fileUtils.readStringFromFile(messageSentStateFile)
-        try:
-            websiteStateAndMessageSent = WebsiteStateAndMessageSentItem.WebsiteStateAndMessageSentItem.fromJson(
-                websiteStateAndMessageSentStateJson)
-        except Exception as e:
-            websiteStateAndMessageSent = WebsiteStateAndMessageSentItem.WebsiteStateAndMessageSentItem()
+        # Get previous check state.
+        websiteStateAndMessageSent = dbWrapper.getWebsiteCheckItemByName(url)
 
         # Try to call website.
         try:
@@ -240,56 +232,65 @@ def getToolStates_backups():
 
 # Check Google Drive folders and add them to backup checks.
 # Similar behaviour as sending request to "/v1/backupcheck", but done directly from the server.
-# MAKE SURE THAT FOLDER IS GIVEN READ WRITES TO ACCOUNT THAT HOLDS CREDENTIALS.
+# MAKE SURE THAT FOLDER IS GIVEN READ RIGHTS TO ACCOUNT THAT HOLDS CREDENTIALS.
 # (See previously working folder's rights in Google Drive for more info)
 def updateGoogleDriveFolderBackupChecks():
-    # Array of ToolStateItems.
-    toolStateItems = []
 
-    # Database connection.
-    dbWrapper = DatabaseWrapper.DatabaseWrapper()
+    try:
 
-    # Connect to google drive.
-    scope = ['https://www.googleapis.com/auth/drive.metadata.readonly']
-    credentials = ServiceAccountCredentials.from_json_keyfile_name('service_account_key.json', scope)
-    service = build('drive', 'v3', credentials=credentials)
+        # Are there any googleDriveFolders to check?
+        googleDriveFoldersToCheck = configUtils.getGoogleDriveFoldersToCheck()
+        if googleDriveFoldersToCheck:
+        
+            # Database connection.
+            dbWrapper = DatabaseWrapper.DatabaseWrapper()
 
-    # Check all Google Drive folders of config.
-    googleDriveFoldersToCheck = config_array["googleDrive"]["foldersToCheck"]
-    for googleDriveFolder in googleDriveFoldersToCheck:
+            # Connect to google drive.
+            credentials = configUtils.getGoogleDriveServiceAccountCredentials()
+            service = build('drive', 'v3', credentials=credentials)
 
-        items = []
-        pageToken = ""
-        while pageToken is not None:
-            response = service.files().list(q="'" + googleDriveFolder["folderID"] + "' in parents", pageSize=1000,
-                                            pageToken=pageToken,
-                                            fields="nextPageToken, files(kind, id, name, createdTime, md5Checksum)").execute()
-            items.extend(response.get('files', []))
-            pageToken = response.get('nextPageToken')
+            # Check all Google Drive folders of config.
+            for googleDriveFolder in googleDriveFoldersToCheck:
 
-        # Sort files by their creation date (newest files first).
-        items.sort(key=getCreationDate, reverse=True)
+                items = []
+                pageToken = ""
+                while pageToken is not None:
+                    response = service.files().list(q="'" + googleDriveFolder["folderID"] + "' in parents", pageSize=1000,
+                                                    pageToken=pageToken,
+                                                    fields="nextPageToken, files(kind, id, name, createdTime, md5Checksum)").execute()
+                    items.extend(response.get('files', []))
+                    pageToken = response.get('nextPageToken')
 
-        if items:
-            backupCheckItem = BackupCheckItem.BackupCheckItem(
-                googleDriveFolder["name"],
-                googleDriveFolder["token"],
-                googleDriveFolder["stateCheckFrequency_inMinutes"],
-                dateStringUtils.convertGoogleDriveDateStringToUnixTimeStamp(items[0]["createdTime"]),
-                items[0]["md5Checksum"],
-                googleDriveFolder["description"]
-            )
-            dbWrapper.createOrUpdateBackupCheck(backupCheckItem)
-        else:
-            backupCheckItem = BackupCheckItem.BackupCheckItem(
-                googleDriveFolder["name"],
-                googleDriveFolder["token"],
-                googleDriveFolder["stateCheckFrequency_inMinutes"],
-                "0",
-                "no items",
-                googleDriveFolder["description"]
-            )
-            dbWrapper.createOrUpdateBackupCheck(backupCheckItem)
+                # Sort files by their creation date (newest files first).
+                items.sort(key=getCreationDate, reverse=True)
+
+                if items:
+                    backupCheckItem = BackupCheckItem.BackupCheckItem(
+                        googleDriveFolder["name"],
+                        googleDriveFolder["token"],
+                        googleDriveFolder["stateCheckFrequency_inMinutes"],
+                        dateStringUtils.convertGoogleDriveDateStringToUnixTimeStamp(items[0]["createdTime"]),
+                        items[0]["md5Checksum"],
+                        googleDriveFolder["description"]
+                    )
+                    dbWrapper.createOrUpdateBackupCheck(backupCheckItem)
+                else:
+                    backupCheckItem = BackupCheckItem.BackupCheckItem(
+                        googleDriveFolder["name"],
+                        googleDriveFolder["token"],
+                        googleDriveFolder["stateCheckFrequency_inMinutes"],
+                        "0",
+                        "no items",
+                        googleDriveFolder["description"]
+                    )
+                    dbWrapper.createOrUpdateBackupCheck(backupCheckItem)
+    
+    # In case of any Error: Log and print errror.
+    except Exception as e:
+        logger = Logger.Logger("check_tools")
+        errormsg = f"stateCheckUtils.updateGoogleDriveFolderBackupChecks(). Error trying to update google drive backup state: {e}"
+        logger.logError(errormsg)
+
 
 
 # Sort files by their creation date -> get creation date of item.

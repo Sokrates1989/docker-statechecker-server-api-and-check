@@ -7,14 +7,16 @@ import json
 class WebsiteStateAndMessageSentItem:
 
     # Constructor.
-    def __init__(self, websiteState="Down", messageHasBeenSent=True):
-        self.websiteState = websiteState
-        self.messageHasBeenSent = messageHasBeenSent
+    def __init__(self, name, state="Down", isDownMessageHasBeenSent=True):
+        self.name = name
+        self.state = state
+        self.isDownMessageHasBeenSent = isDownMessageHasBeenSent
 
     def asMap(self):
         return {
-            "websiteState": self.websiteState,
-            "messageHasBeenSent": self.messageHasBeenSent,
+            "name": self.name,
+            "state": self.state,
+            "isDownMessageHasBeenSent": self.isDownMessageHasBeenSent,
         }
 
     def toJson(self):
@@ -23,7 +25,7 @@ class WebsiteStateAndMessageSentItem:
 
     # Checks, if the newly received website state has already been sent based on classes values.
     def isMessageIsDownMessageLastSentMessage(self):
-        if self.websiteState == "Down" and self.messageHasBeenSent == True:
+        if self.state == "Down" and self.isDownMessageHasBeenSent == True:
             return True
         else:
             return False
@@ -32,5 +34,6 @@ class WebsiteStateAndMessageSentItem:
     @staticmethod
     def fromJson(jsonString):
         asMap = json.loads(jsonString)
-        return WebsiteStateAndMessageSentItem(websiteState=asMap["websiteState"],
-                                              messageHasBeenSent=asMap["messageHasBeenSent"])
+        return WebsiteStateAndMessageSentItem(name=asMap["name"],
+                                              state=asMap["state"],
+                                              isDownMessageHasBeenSent=asMap["isDownMessageHasBeenSent"])

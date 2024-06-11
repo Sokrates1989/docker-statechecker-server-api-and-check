@@ -9,12 +9,10 @@ import os
 import sys
 sys.path.insert(1, os.path.join(os.path.dirname(__file__), "src/", "utils"))
 sys.path.insert(1, os.path.join(os.path.dirname(__file__), "src/", "models"))
+sys.path.insert(1, os.path.join(os.path.dirname(__file__), "src/", "definitions"))
 
 # Database Connection.
 import databaseWrapper as DatabaseWrapper
-
-# Checking credentials with hash utils.
-import hashUtils
 
 # StateCheckItem from own models to use location independent.
 import stateCheckItem as StateCheckItem

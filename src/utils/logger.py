@@ -3,8 +3,6 @@
 ## Imports.
 # For file operations with operating system.
 import os
-# to retreive config information
-import json
 
 ## Own Modules.
 # For creating files.
@@ -18,11 +16,6 @@ class Logger:
 	# Constructor creating logfiles and paths.
 	def __init__(self, logScope="check_tools"):
 
-		# Get config .
-		config_file_pathAndName = os.path.join(os.path.dirname(__file__), "..", "..", "config.txt")
-		config_file = open(config_file_pathAndName)
-		config_array = json.load(config_file)
-
 		# What am I logging stuff for?
 		if logScope == "check_tools":
 			self.logtext_info = "TOOLCHECKER_INFO"
@@ -34,7 +27,7 @@ class Logger:
 			self.logtext_error = "UNKNOWN_ERROR"
 
 		# Global logs.
-		self.logPath = os.path.join(config_array["installPath"] , "logs")
+		self.logPath = os.path.join("/code" , "logs")
 		self.globalErrorLogFile = os.path.join(self.logPath , "errorlog.txt")
 		self.globalLogFile = os.path.join(self.logPath , "log.txt")
 		fileUtils.createFileIfNotExists(self.globalErrorLogFile)
@@ -68,10 +61,13 @@ class Logger:
 		fullLogText = "\n" + dateStringUtils.getDateStringForLogTag() + " - " + "[" + self.logtext_error + "]" + " - [" + errorToLog + "]"
 
 		# write fullLogText to both info and error logs (day and global log files)
-		self.log(self.globalErrorLogFile, fullLogText)
-		self.log(self.globalLogFile, fullLogText)
-		self.log(self.dayBasedErrorLogFile, fullLogText)
-		self.log(self.dayBasedLogFile, fullLogText)
+		self._log(self.globalErrorLogFile, fullLogText)
+		self._log(self.globalLogFile, fullLogText)
+		self._log(self.dayBasedErrorLogFile, fullLogText)
+		self._log(self.dayBasedLogFile, fullLogText)
+
+		# Print message to CLI.
+		self._print_log_message(fullLogText)
 
 
 	## Logs a Warning to 4 logfiles.
@@ -86,10 +82,13 @@ class Logger:
 		fullLogText = "\n" + dateStringUtils.getDateStringForLogTag() + " - " + "[" + self.logtext_warning + "]" + " - [" + warningToLog + "]"
 
 		# write fullLogText to both info and error logs (day and global log files)
-		self.log(self.globalErrorLogFile, fullLogText)
-		self.log(self.globalLogFile, fullLogText)
-		self.log(self.dayBasedErrorLogFile, fullLogText)
-		self.log(self.dayBasedLogFile, fullLogText)
+		self._log(self.globalErrorLogFile, fullLogText)
+		self._log(self.globalLogFile, fullLogText)
+		self._log(self.dayBasedErrorLogFile, fullLogText)
+		self._log(self.dayBasedLogFile, fullLogText)
+
+		# Print message to CLI.
+		self._print_log_message(fullLogText)
 
 
 	## Logs an Information to 2 logfiles.
@@ -104,11 +103,32 @@ class Logger:
 		fullLogText = "\n" + dateStringUtils.getDateStringForLogTag() + " - " + "[" + self.logtext_info + "]" + " - [" + informationToLog + "]"
 
 		# write fullLogText info logs (day and global log files)
-		self.log(self.globalLogFile, fullLogText)
-		self.log(self.dayBasedLogFile, fullLogText)
+		self._log(self.globalLogFile, fullLogText)
+		self._log(self.dayBasedLogFile, fullLogText)
+
+		# Print message to CLI.
+		self._print_log_message(fullLogText)
 
 
 	# PRIVATE function write a string to a file
-	def log(self, file, fullLogText):
+	def _log(self, file, fullLogText):
 		with open(file, 'a+') as f:
 			f.write("\n" + fullLogText)
+	
+	
+
+	def _print_log_message(self, message_to_print:str):
+		"""
+		Print message to cli.
+
+		Replaces Special tags to improve output.
+
+		Args:
+			message_to_print (str): The message to pring.
+		"""
+		# String replacements.
+		message_to_print=message_to_print.replace("<EMPHASIZE_STRING_START_TAG>", "\"")
+		message_to_print=message_to_print.replace("</EMPHASIZE_STRING_END_TAG>", "\"")
+
+		# Print message.
+		print(message_to_print)
