@@ -5,14 +5,18 @@ from datetime import datetime
 # For getting unixtimestamp.
 import time
 
+# Get timezone from config.
+import configUtils as ConfigUtils
+configUtils = ConfigUtils.ConfigUtils()
+
 # Get string like "2022_03_31".
 def getDateStringForLogFileName():
-	now  = datetime.now()
+	now  = datetime.now(configUtils.getTimezone())
 	return now.strftime("%Y_%m_%d")
 
 # Get string like "[2022-03-31 22:02:04]".
 def getDateStringForLogTag():
-	now  = datetime.now()
+	now  = datetime.now(configUtils.getTimezone())
 	date_time = now.strftime("%Y-%m-%d %H:%M:%S")
 	currentLogTimeString = "[" + date_time + "]"
 	return currentLogTimeString

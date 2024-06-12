@@ -13,6 +13,9 @@ import json
 # String verification.
 import re
 
+# For making time timezone aware.
+import pytz
+
 # For safely parsing json string to dict (https://stackoverflow.com/questions/988228/convert-a-string-representation-of-a-dictionary-to-a-dictionary).
 import ast
 
@@ -622,6 +625,7 @@ class ConfigUtils:
         return int(googleDriveChecksEveryXMinutes)
     
 
+    # Other methods.
     def calculateOffset(self, base_to_calulate_offset_from):
         """
         Calculate reduced time based on provided offset.
@@ -641,3 +645,31 @@ class ConfigUtils:
             calculated_value_with_offset = 1
 
         return float(calculated_value_with_offset)
+    
+    
+
+    def getTimezone(self):
+        """
+        Get the timezone based on the environment variable TIMEZONE.
+
+        View all valid timezones: https://mljar.com/blog/list-pytz-timezones/
+
+        Returns:
+            pytz.timezone: A pytz timezone object representing the timezone.
+        """
+        # Default timezone to UTC.
+        timezone = 'Etc/UTC'
+        try:
+            # Try to get the timezone from the environment variable.
+            timezone = os.getenv("TIMEZONE")
+        except Exception as e:
+            # Log a warning if timezone could not be retrieved from environment.
+            pass
+        finally:
+            # Check if the provided timezone is valid.
+            if timezone not in pytz.all_timezones:
+                # Log a warning if the timezone is invalid and default to UTC.
+                timezone = "Etc/UTC"
+
+        # Return the timezone object.
+        return pytz.timezone(timezone)

@@ -69,26 +69,26 @@ def infoCheckingToolsIsWorking(justStartedChecking=False, telegramTimeReached=Fa
     infoLogText = "<b><u>Tools are being checked.</u></b>\nWebsites are being checked every <b>" + str(
         checkWebsitesEveryXMinutes) + "</b> minutes"
     if justStartedChecking:
-        infoLogText += "\nJust (re-)started checking tools."
+        infoLogText += "\nJust (re-)started checking tools.\n"
         
         # Telegram message enabled? -> Add frequency info.
         if configUtils.areTelegramStatusMessagesEnabled():
-            infoLogText += "\n\nAbout every <b>" + str(telegramMessageEveryXMinutes) + "</b> minutes a status message should be send, to verify that this program is still working correctly."
+            infoLogText += "\nAbout every <b>" + str(telegramMessageEveryXMinutes) + "</b> minutes a telegram message should be send, to verify that this program is still working correctly."
         
         # Email message enabled? -> Add frequency info.
         if configUtils.areEmailStatusMessagesEnabled():
-            infoLogText += "\n\nAbout every <b>" + str(emailMessageEveryXMinutes) + "</b> minutes a status message should be send, to verify that this program is still working correctly."
+            infoLogText += "\nAbout every <b>" + str(emailMessageEveryXMinutes) + "</b> minutes a status email should be send, to verify that this program is still working correctly."
     else:
-        infoLogText += "\n\nThis is an information to ensure, that the program is working correctly."
+        infoLogText += "\n\nThis is an information to ensure, that the program is working correctly.\n"
         
         # Telegram message enabled and telegramtimeReached? -> Add frequency info.
         if configUtils.areTelegramStatusMessagesEnabled() and telegramTimeReached:
-            infoLogText += "\n\nThis message should show up again in " + str(
+            infoLogText += "\nThis message should show up again in " + str(
             telegramMessageEveryXMinutes) + " minutes, verifying that this program is still working correctly."
         
         # Email message enabled and emailtimeReached? -> Add frequency info.
         if configUtils.areEmailStatusMessagesEnabled() and emailTimeReached:
-            infoLogText += "\n\nThis message should show up again in " + str(
+            infoLogText += "\nThis message should show up again in " + str(
             emailMessageEveryXMinutes) + " minutes, verifying that this program is still working correctly."
 
     infoLogText += "\nIf not -> Try to restart this program and take a look at the logs."
