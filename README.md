@@ -5,7 +5,6 @@ To deploy use https://github.com/Sokrates1989/swarm-statechecker-server.git
 
 # Backlog
 Stuff to do, that just could not be done in time
-- Server auth token
 - Logging
     - Log and print via telegram and email as well
     - Log more
