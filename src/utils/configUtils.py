@@ -10,6 +10,9 @@ import os
 # For getting config.
 import json
 
+# String verification.
+import re
+
 # For safely parsing json string to dict (https://stackoverflow.com/questions/988228/convert-a-string-representation-of-a-dictionary-to-a-dictionary).
 import ast
 
@@ -157,6 +160,44 @@ class ConfigUtils:
         return db_name
     
     # Telegram settings.
+    def areTelegramStatusMessagesEnabled(self):
+        """
+        Are telgram status messages enabled?
+
+        Returns:
+            (bool): Whether telegram status messages are enabled.
+        """
+        areTelegramStatusMessagesEnabled=os.getenv("TELEGRAM_ENABLED")
+        if areTelegramStatusMessagesEnabled:
+            areTelegramStatusMessagesEnabled = areTelegramStatusMessagesEnabled.strip().strip("\"").lower() == "true"
+        else:
+            areTelegramStatusMessagesEnabled = True
+            if "telegram" in self._config_array:
+                if "enabled" in self._config_array["telegram"]:
+                        areTelegramStatusMessagesEnabled = self._config_array["telegram"]["enabled"].strip().strip("\"").lower() == "true"
+        return bool(areTelegramStatusMessagesEnabled)
+    
+
+    def getTelegramStatusMessagesEveryXMinutes(self):
+        """
+        Get amount of minutes when to send telegram status messages.
+
+        Send telegram status messages every x minutes based on this value.
+
+        Returns:
+            (int): Amount of minutes between each telegram status message.
+        """
+        telegramStatusMessageEveryXMinutes=os.getenv("TELEGRAM_STATUS_MESSAGES_EVERY_X_MINUTES")
+        if telegramStatusMessageEveryXMinutes:
+            telegramStatusMessageEveryXMinutes = telegramStatusMessageEveryXMinutes.strip().strip("\"")
+        else:
+            if "telegram" in self._config_array:
+                if "adminStatusMessage_everyXMinutes" in self._config_array["telegram"]:
+                    telegramStatusMessageEveryXMinutes = self._config_array["telegram"]["adminStatusMessage_everyXMinutes"]
+
+        return self._calculateEveryXMinutesWithOffset(int(telegramStatusMessageEveryXMinutes))
+    
+
     def getTelegramBotToken(self):
         """
         Get telegram bot token.
@@ -194,11 +235,11 @@ class ConfigUtils:
         """
         errorChatIDs=os.getenv("TELEGRAM_RECIPIENTS_ERROR_CHAT_IDS")
         if errorChatIDs:
-            errorChatIDs = [item.strip() for item in errorChatIDs.strip().strip("\"").split(',')]
+            errorChatIDs, warnings = self._get_telegram_array_from_telegram_chats_list_string(errorChatIDs)
         else:
             if "telegram" in self._config_array:
                 if "errorChatIDs" in self._config_array["telegram"]:
-                    errorChatIDs = [item.strip() for item in self._config_array["telegram"]["errorChatIDs"].strip().strip("\"").split(',')]
+                    errorChatIDs, warnings = self._get_telegram_array_from_telegram_chats_list_string(self._config_array["telegram"]["errorChatIDs"].strip().strip("\""))
                 elif "errorChatID" in self._config_array["telegram"]:
                     errorChatIDs=[]
                     errorChatIDs.append(self._config_array["telegram"]["errorChatID"])
@@ -214,19 +255,68 @@ class ConfigUtils:
         """
         infoChatIDs=os.getenv("TELEGRAM_RECIPIENTS_INFO_CHAT_IDS")
         if infoChatIDs:
-            infoChatIDs = [item.strip() for item in infoChatIDs.strip().strip("\"").split(',')]
+            infoChatIDs, warnings = self._get_telegram_array_from_telegram_chats_list_string(infoChatIDs)
         else:
             if "telegram" in self._config_array:
                 if "infoChatIDs" in self._config_array["telegram"]:
-                    infoChatIDs = [item.strip() for item in self._config_array["telegram"]["infoChatIDs"].strip().strip("\"").split(',')]
+                    infoChatIDs, warnings = self._get_telegram_array_from_telegram_chats_list_string(self._config_array["telegram"]["infoChatIDs"].strip().strip("\""))
                 elif "infoChatID" in self._config_array["telegram"]:
                     infoChatIDs=[]
                     infoChatIDs.append(self._config_array["telegram"]["infoChatID"])
         return infoChatIDs
+
+
+
+    def _get_telegram_array_from_telegram_chats_list_string(self, telegram_chats_list_string):
+        """
+        Extracts an array of telegram chat ids from a comma-separated string of telegram chat ids.
+
+        Args:
+        - telegram_chats_list_string (str): A comma-separated string containing telegram chat ids.
+
+        Returns:
+        A tuple consisting of:
+        - valid_telegram_chats (list): A list of valid telegram chat ids extracted from the input string.
+        - warnings (list): A list of warnings generated during the process, such as invalid telegram chat ids.
+        """
+        warnings = []  # A list to store any warnings encountered during processing.
+        valid_telegram_chats = []  # A list to store valid telegram chat ids.
+
+        try:
+            # If the input string is empty or 'None', return empty lists.
+            if not telegram_chats_list_string or telegram_chats_list_string.lower() == "none":
+                return valid_telegram_chats, warnings
+
+            # Split the string by commas and strip any whitespace from each chat id.
+            telegram_array = [telegram.strip() for telegram in telegram_chats_list_string.split(',')]
+
+            # Validate each telegram in the array
+            for telegram_chat_id in telegram_array:
+                if self._is_telegram_chat_id_valid(telegram_chat_id):
+                    valid_telegram_chats.append(telegram_chat_id)
+                else:
+                    # If an telegram is invalid, add a warning to the list.
+                    warnings.append(f"Invalid Telegram Chat ID: <EMPHASIZE_STRING_START_TAG>{telegram_chat_id}</EMPHASIZE_STRING_END_TAG> was not added to the recipients.")
+
+            return valid_telegram_chats, warnings
+            
+        except Exception as e:
+            # If any unexpected error occurs, add a warning with details.
+            warnings.append(f"Error extracting telegram chat ids from string <EMPHASIZE_STRING_START_TAG>{telegram_chats_list_string}</EMPHASIZE_STRING_END_TAG>: {str(e)}")
+            return valid_telegram_chats, warnings
+        
+
+    def _is_telegram_chat_id_valid(self, chat_id):
+        """
+        Check if the given telegram chat id is valid.
+        """
+        chat_id_regex = r'^-?\d+$'  # An optional negative sign followed by one or more digits
+        return re.match(chat_id_regex, str(chat_id)) is not None
+
     
 
     # Status Messages.
-    def getStatusMessagesTimeOffsetPercentage(self):
+    def _getStatusMessagesTimeOffsetPercentage(self):
         """
         Get time offset besed on the amount of time the calculation handling takes, to make every x minutes more accurate.
 
@@ -237,45 +327,13 @@ class ConfigUtils:
         if telegramStatusMessageEveryXMinutes:
             telegramStatusMessageEveryXMinutes = telegramStatusMessageEveryXMinutes.strip().strip("\"")
         else:
-            if "telegram" in self._config_array:
+            if "adminStatusMessage_operationTime_offsetPercentage" in self._config_array:
+                    telegramStatusMessageEveryXMinutes = self._config_array["adminStatusMessage_operationTime_offsetPercentage"]
+            elif "telegram" in self._config_array:
                 if "adminStatusMessage_operationTime_offsetPercentage" in self._config_array["telegram"]:
                     telegramStatusMessageEveryXMinutes = self._config_array["telegram"]["adminStatusMessage_operationTime_offsetPercentage"]
         return float(telegramStatusMessageEveryXMinutes)
     
-
-    # Telegram.
-    def areTelegramStatusMessagesEnabled(self):
-        """
-        Are telgram status messages enabled?
-
-        Returns:
-            (bool): Whether telegram status messages are enabled.
-        """
-        areTelegramStatusMessagesEnabled=os.getenv("TELEGRAM_ENABLED")
-        if areTelegramStatusMessagesEnabled:
-            areTelegramStatusMessagesEnabled = areTelegramStatusMessagesEnabled.strip().strip("\"").lower() == "true"
-        else:
-            areTelegramStatusMessagesEnabled = True
-        return int(areTelegramStatusMessagesEnabled)
-    
-
-    def getTelegramStatusMessagesEveryXMinutes(self):
-        """
-        Get amount of minutes when to send telegram status messages.
-
-        Send telegram status messages every x minutes based on this value.
-
-        Returns:
-            (int): Amount of minutes between each telegram status message.
-        """
-        telegramStatusMessageEveryXMinutes=os.getenv("TELEGRAM_STATUS_MESSAGES_EVERY_X_MINUTES")
-        if telegramStatusMessageEveryXMinutes:
-            telegramStatusMessageEveryXMinutes = telegramStatusMessageEveryXMinutes.strip().strip("\"")
-        else:
-            if "telegram" in self._config_array:
-                if "adminStatusMessage_everyXMinutes" in self._config_array["telegram"]:
-                    telegramStatusMessageEveryXMinutes = self._config_array["telegram"]["adminStatusMessage_everyXMinutes"]
-        return int(telegramStatusMessageEveryXMinutes)
     
 
     # Email.
@@ -290,8 +348,135 @@ class ConfigUtils:
         if areEmailStatusMessagesEnabled:
             areEmailStatusMessagesEnabled = areEmailStatusMessagesEnabled.strip().strip("\"").lower() == "true"
         else:
-            areEmailStatusMessagesEnabled = True
-        return int(areEmailStatusMessagesEnabled)
+            areEmailStatusMessagesEnabled = False
+            if "email" in self._config_array:
+                if "enabled" in self._config_array["email"]:
+                        areEmailStatusMessagesEnabled = self._config_array["email"]["enabled"].strip().strip("\"").lower() == "true"
+        return bool(areEmailStatusMessagesEnabled)
+    
+    
+    def getEmailSenderUser(self):
+        """
+        Get email sender user.
+
+        Returns:
+            (str): User for smtp email sender.
+        """
+        email_sender_user=os.getenv("EMAIL_SENDER_USER")
+        if email_sender_user:
+            email_sender_user = email_sender_user.strip().strip("\"")
+        else:
+            email_sender_user = ""
+            if "email" in self._config_array:
+                if "sender" in self._config_array["email"]:
+                    if "user" in self._config_array["email"]["sender"]:
+                        email_sender_user = self._config_array["email"]["sender"]["user"]
+        return email_sender_user
+    
+    
+    def getEmailSenderPassword(self):
+        """
+        Get email sender password.
+
+        Returns:
+            (str): User for smtp email sender.
+        """
+        email_sender_password=""
+        try:
+            EMAIL_SENDER_PASSWORD_FILE = os.getenv("EMAIL_SENDER_PASSWORD_FILE")
+            with open(f"{EMAIL_SENDER_PASSWORD_FILE}", "r") as email_sender_password_file:
+                email_sender_password = email_sender_password_file.read().strip()
+        except:
+            pass
+        finally:
+            # In case of an error or the secret is not set.
+            if not email_sender_password or email_sender_password.lower() == "none":
+                email_sender_password = os.getenv('EMAIL_SENDER_PASSWORD').strip().strip("\"")
+        if not email_sender_password or email_sender_password == "":
+            # Get PW from config.
+            email_sender_password = ""
+            if "email" in self._config_array:
+                if "sender" in self._config_array["email"]:
+                    if "password" in self._config_array["email"]["sender"]:
+                        email_sender_password = self._config_array["email"]["sender"]["password"]
+                    
+        return email_sender_password
+    
+    
+    def getEmailSenderHost(self):
+        """
+        Get email sender host.
+
+        Returns:
+            (str): Host for smtp email sender.
+        """
+        email_sender_host=os.getenv("EMAIL_SENDER_HOST")
+        if email_sender_host:
+            email_sender_host = email_sender_host.strip().strip("\"")
+        else:
+            email_sender_host = ""
+            if "email" in self._config_array:
+                if "sender" in self._config_array["email"]:
+                    if "host" in self._config_array["email"]["sender"]:
+                        email_sender_host = self._config_array["email"]["sender"]["host"]
+        return email_sender_host
+    
+    
+    def getEmailSenderPort(self):
+        """
+        Get email sender port.
+
+        Returns:
+            (str): Port for smtp email sender.
+        """
+        email_sender_port=os.getenv("EMAIL_SENDER_PORT")
+        if email_sender_port:
+            email_sender_port = email_sender_port.strip().strip("\"")
+        else:
+            email_sender_port = ""
+            if "email" in self._config_array:
+                if "sender" in self._config_array["email"]:
+                    if "port" in self._config_array["email"]["sender"]:
+                        email_sender_port = self._config_array["email"]["sender"]["port"]
+        return int(email_sender_port)
+    
+    
+
+    def getEmailErrorAdresses(self):
+        """
+        Get email adresses to send error messages to.
+
+        Returns:
+            (array): Email adresses for errors.
+        """
+        errorMailAddresses=os.getenv("EMAIL_RECIPIENTS_ERROR")
+        if errorMailAddresses:
+            errorMailAddresses, warnings = self._get_email_array_from_emails_list_string(errorMailAddresses)
+        else:
+            if "email" in self._config_array:
+                if "recipients" in self._config_array["email"]:
+                    if "error" in self._config_array["email"]["recipients"]:
+                        errorMailAddresses, warnings = self._get_email_array_from_emails_list_string(self._config_array["email"]["recipients"]["error"].strip().strip("\""))
+        return errorMailAddresses
+
+
+    def getEmailInfoAdresses(self):
+        """
+        Get email adresses to send info messages to.
+
+        Returns:
+            (array): Email adresses for info messages.
+        """
+        infoMailAddresses=os.getenv("EMAIL_RECIPIENTS_INFORMATION")
+        if infoMailAddresses:
+            infoMailAddresses, warnings = self._get_email_array_from_emails_list_string(infoMailAddresses)
+        else:
+            if "email" in self._config_array:
+                if "recipients" in self._config_array["email"]:
+                    if "info" in self._config_array["email"]["recipients"]:
+                        infoMailAddresses, warnings = self._get_email_array_from_emails_list_string(self._config_array["email"]["recipients"]["info"].strip().strip("\""))
+        return infoMailAddresses
+
     
     def getEmailStatusMessagesEveryXMinutes(self):
         """
@@ -302,7 +487,7 @@ class ConfigUtils:
         Returns:
             (int): Amount of minutes between each email status message.
         """
-        emailStatusMessageEveryXMinutes=os.getenv("TELEGRAM_STATUS_MESSAGES_EVERY_X_MINUTES")
+        emailStatusMessageEveryXMinutes=os.getenv("EMAIL_STATUS_MESSAGES_EVERY_X_MINUTES")
         if emailStatusMessageEveryXMinutes:
             emailStatusMessageEveryXMinutes = emailStatusMessageEveryXMinutes.strip().strip("\"")
         else:
@@ -310,7 +495,55 @@ class ConfigUtils:
             if "email" in self._config_array:
                 if "adminStatusMessage_everyXMinutes" in self._config_array["email"]:
                     emailStatusMessageEveryXMinutes = self._config_array["email"]["adminStatusMessage_everyXMinutes"]
-        return int(emailStatusMessageEveryXMinutes)
+        return self._calculateEveryXMinutesWithOffset(int(emailStatusMessageEveryXMinutes))
+    
+    
+
+    def _get_email_array_from_emails_list_string(self, emails_list_string):
+        """
+        Extracts an array of emails from a comma-separated string of emails.
+
+        Args:
+        - emails_list_string (str): A comma-separated string containing email addresses.
+
+        Returns:
+        A tuple consisting of:
+        - valid_emails (list): A list of valid email addresses extracted from the input string.
+        - warnings (list): A list of warnings generated during the process, such as invalid emails.
+        """
+        warnings = []  # A list to store any warnings encountered during processing.
+        valid_emails = []  # A list to store valid email addresses.
+
+
+        try:
+            # If the input string is empty or 'None', return empty lists.
+            if not emails_list_string or emails_list_string.lower() == "none":
+                return valid_emails, warnings
+
+            # Split the string by commas and strip any whitespace from each .
+            email_array = [email.strip() for email in emails_list_string.split(',')]
+
+            # Validate each email in the array
+            for email in email_array:
+                if self._is_email_valid(email):
+                    valid_emails.append(email)
+                else:
+                    # If an email is invalid, add a warning to the list.
+                    warnings.append(f"Invalid Email: <EMPHASIZE_STRING_START_TAG>{email}</EMPHASIZE_STRING_END_TAG> was not added to the recipients.")
+
+            return valid_emails, warnings
+            
+        except Exception as e:
+            # If any unexpected error occurs, add a warning with details.
+            warnings.append(f"Error extracting emails from string <EMPHASIZE_STRING_START_TAG>{emails_list_string}</EMPHASIZE_STRING_END_TAG>: {str(e)}")
+            return valid_emails, warnings
+
+    def _is_email_valid(self, email):
+        """
+        Check if the given email address is valid.
+        """
+        email_regex = r'^[\w\.-]+@[a-zA-Z\d\.-]+\.[a-zA-Z]{2,}$'
+        return re.match(email_regex, email) is not None
 
     
 
@@ -330,7 +563,7 @@ class ConfigUtils:
             if "websites" in self._config_array:
                 if "checkWebSitesEveryXMinutes" in self._config_array["websites"]:
                     websiteChecksEveryXMinutes = self._config_array["websites"]["checkWebSitesEveryXMinutes"]
-        return int(websiteChecksEveryXMinutes)
+        return self._calculateEveryXMinutesWithOffset(int(websiteChecksEveryXMinutes))
     
 
     # Google Drive.
@@ -386,6 +619,23 @@ class ConfigUtils:
             if "googleDrive" in self._config_array:
                 if "checkFilesEveryXMinutes" in self._config_array["googleDrive"]:
                     googleDriveChecksEveryXMinutes = self._config_array["googleDrive"]["checkFilesEveryXMinutes"]
-        return int(googleDriveChecksEveryXMinutes)
+        return self._calculateEveryXMinutesWithOffset(int(googleDriveChecksEveryXMinutes))
     
 
+    def _calculateEveryXMinutesWithOffset(self, everyXMinutesWithoutOffset):
+        """
+        Calculate everyxMinutes with privided offset
+
+        Args:
+        - everyXMinutesWithoutOffset (int): The every x minutes value without calcluated offset.
+
+        Returns:
+            (int): EveryXMinutes with calculated offset.
+        """
+        calculatedXMinutes = int(everyXMinutesWithoutOffset - (
+                    everyXMinutesWithoutOffset * self._getStatusMessagesTimeOffsetPercentage() / 100))
+        # Avoid zero devision error.
+        if calculatedXMinutes == 0:
+            calculatedXMinutes = 1
+
+        return int(calculatedXMinutes)

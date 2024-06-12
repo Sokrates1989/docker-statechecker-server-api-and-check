@@ -21,6 +21,7 @@ import stringUtils
 import logger as Logger
 import databaseWrapper as DatabaseWrapper
 import configUtils as ConfigUtils
+import emailUtils as EmailUtils
 
 ## Initialize vars.
 
@@ -39,6 +40,9 @@ bot = telebot.TeleBot(botToken, parse_mode="HTML")
 errorChatIDs = configUtils.getTelegramErrorChatsIDs()
 infoChatIDs = configUtils.getTelegramInfoChatsIDs()
 
+# Initialize email messaging.
+emailUtils = EmailUtils.EmailUtils()
+
 
 # Handles error exceptions (log and info to admin).
 def handleCommandException(exceptionLocationAndAdditionalInformation, exception):
@@ -55,6 +59,9 @@ def handleCommandException(exceptionLocationAndAdditionalInformation, exception)
         for errorChatID in errorChatIDs:
             bot.send_message(errorChatID, errorLogText)
 
+    # Send mails.
+    emailUtils.send_error_mails(errorLogText)
+
 
 # Info, that checking schedule is still taking place (log and info).
 def infoCheckingToolsIsWorking(justStartedChecking=False, telegramTimeReached=False, emailTimeReached=False):
@@ -63,10 +70,10 @@ def infoCheckingToolsIsWorking(justStartedChecking=False, telegramTimeReached=Fa
         checkWebsitesEveryXMinutes) + "</b> minutes"
     if justStartedChecking:
         infoLogText += "\nJust (re-)started checking tools.\n\nAbout every " + str(
-            telegramMessageEvery_desiredMinutes) + " minutes a status message should be send, to verify that this program is still working correctly."
+            telegramMessageEveryXMinutes) + " minutes a status message should be send, to verify that this program is still working correctly."
     else:
         infoLogText += "\n\nThis is an information to ensure, that the program is working correctly.\n\nThis message should show up again in " + str(
-            telegramMessageEvery_desiredMinutes) + " minutes, verifying that this program is still working correctly."
+            telegramMessageEveryXMinutes) + " minutes, verifying that this program is still working correctly."
     infoLogText += "\nIf not -> Try to restart this program and take a look at the logs."
 
     # Add status message of checked tools.
@@ -96,20 +103,19 @@ def infoCheckingToolsIsWorking(justStartedChecking=False, telegramTimeReached=Fa
             for infoChatID in infoChatIDs:
                 bot.send_message(infoChatID, infoLogText)
 
+    # Send mails.
+    if justStartedChecking or emailTimeReached:
+        emailUtils.send_info_mails(infoLogText)
+
 
 ## Check whether a scheduled countdown has to be sent.
 
 # Only print every xth time, that we are still checking.
 printEvery = 100
 
-# Status message to admin chat, that tool is up.
-telegramMessageEvery_desiredMinutes = configUtils.getTelegramStatusMessagesEveryXMinutes()
-adminMessageEvery_offsetPercentageCalculatingProcessionTime = configUtils.getStatusMessagesTimeOffsetPercentage()
-telegramMessageEvery_calculatedOffset = int(telegramMessageEvery_desiredMinutes - (
-            telegramMessageEvery_desiredMinutes * adminMessageEvery_offsetPercentageCalculatingProcessionTime / 100))
-# Avoid zero devision error.
-if telegramMessageEvery_calculatedOffset == 0:
-    telegramMessageEvery_calculatedOffset = 1
+# When to send messages?
+telegramMessageEveryXMinutes = configUtils.getTelegramStatusMessagesEveryXMinutes()
+emailMessageEveryXMinutes = configUtils.getEmailStatusMessagesEveryXMinutes()
 
 # How often to check websiteStates.
 checkWebsitesEveryXMinutes = configUtils.getWebsiteChecksEveryXMinutes()
@@ -186,6 +192,9 @@ while True:
                         bot = telebot.TeleBot(botToken, parse_mode="HTML")
                         for errorChatID in errorChatIDs:
                             bot.send_message(errorChatID, toolStateItemIsDownMsg)
+
+                    # Send mails.
+                    emailUtils.send_error_mails(toolStateItemIsDownMsg)
                     
 
 
@@ -227,9 +236,14 @@ while True:
                         for errorChatID in errorChatIDs:
                             bot.send_message(errorChatID, toolStateItemIsUpAgainMsg)
 
+                    # Send mails.
+                    emailUtils.send_error_mails(toolStateItemIsUpAgainMsg)
+
         # Send message to admin chat.
-        if (i % telegramMessageEvery_calculatedOffset == 0):
+        if (i % telegramMessageEveryXMinutes == 0):
             infoCheckingToolsIsWorking(telegramTimeReached=True)
+        if (i % emailMessageEveryXMinutes == 0):
+            infoCheckingToolsIsWorking(emailTimeReached=True)
 
         # Sleep 60 seconds.
         time.sleep(60)

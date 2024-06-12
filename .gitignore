@@ -13,7 +13,6 @@ messageSentStates
 # Do not version google drive authentication key. 
 service_account_key.json
 
-
 # Do not version logs. 
 logs/*
 logs/dayBased/*

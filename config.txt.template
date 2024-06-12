@@ -1,5 +1,6 @@
 {
 	"toolsUsingApi_tolerancePeriod_inSeconds": "100",
+	"adminStatusMessage_operationTime_offsetPercentage":"3.4",
 	"database":
 	{
 		"host":"10.5.0.1",
@@ -10,11 +11,26 @@
 	},
 	"telegram":
 	{
-		"botToken":"ENTERTHEBOTTOKEN_THEBOTFATHERGAVETOYOU",
-		"errorChatID":"-xxxxxxxxx",
-		"infoChatID":"-xxxxxxxxx",
+		"enabled": "true",
 		"adminStatusMessage_everyXMinutes":"60",
-		"adminStatusMessage_operationTime_offsetPercentage":"3.4"
+		"botToken":"ENTERTHEBOTTOKEN_THEBOTFATHERGAVETOYOU",
+		"errorChatIDs":"-xxxxxxxxx, -xxxxxxxxx",
+		"infoChatIDs":"-xxxxxxxxx, -xxxxxxxxx"
+	},
+	"email":
+	{
+		"enabled": "false",
+		"adminStatusMessage_everyXMinutes":"60",
+		"sender": {
+			"user":"email@domain.com",
+			"password":"Password for sender user",
+			"host":"smtp.example.com",
+			"port":"587"
+		},
+		"recipients": {
+			"info":"email1@domain.com, email2@domain.com",
+			"error":"email1@domain.com, email2@domain.com"
+		}
 	},
 	"websites":
 	{
