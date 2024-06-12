@@ -195,7 +195,7 @@ class ConfigUtils:
                 if "adminStatusMessage_everyXMinutes" in self._config_array["telegram"]:
                     telegramStatusMessageEveryXMinutes = self._config_array["telegram"]["adminStatusMessage_everyXMinutes"]
 
-        return self._calculateEveryXMinutesWithOffset(int(telegramStatusMessageEveryXMinutes))
+        return int(telegramStatusMessageEveryXMinutes)
     
 
     def getTelegramBotToken(self):
@@ -495,7 +495,7 @@ class ConfigUtils:
             if "email" in self._config_array:
                 if "adminStatusMessage_everyXMinutes" in self._config_array["email"]:
                     emailStatusMessageEveryXMinutes = self._config_array["email"]["adminStatusMessage_everyXMinutes"]
-        return self._calculateEveryXMinutesWithOffset(int(emailStatusMessageEveryXMinutes))
+        return int(emailStatusMessageEveryXMinutes)
     
     
 
@@ -563,7 +563,7 @@ class ConfigUtils:
             if "websites" in self._config_array:
                 if "checkWebSitesEveryXMinutes" in self._config_array["websites"]:
                     websiteChecksEveryXMinutes = self._config_array["websites"]["checkWebSitesEveryXMinutes"]
-        return self._calculateEveryXMinutesWithOffset(int(websiteChecksEveryXMinutes))
+        return int(websiteChecksEveryXMinutes)
     
 
     # Google Drive.
@@ -619,23 +619,25 @@ class ConfigUtils:
             if "googleDrive" in self._config_array:
                 if "checkFilesEveryXMinutes" in self._config_array["googleDrive"]:
                     googleDriveChecksEveryXMinutes = self._config_array["googleDrive"]["checkFilesEveryXMinutes"]
-        return self._calculateEveryXMinutesWithOffset(int(googleDriveChecksEveryXMinutes))
+        return int(googleDriveChecksEveryXMinutes)
     
 
-    def _calculateEveryXMinutesWithOffset(self, everyXMinutesWithoutOffset):
+    def calculateOffset(self, base_to_calulate_offset_from):
         """
-        Calculate everyxMinutes with privided offset
+        Calculate reduced time based on provided offset.
+
+        Offset is caused from the time consumed by operation time of checking tools.
 
         Args:
-        - everyXMinutesWithoutOffset (int): The every x minutes value without calcluated offset.
+        - base_to_calulate_offset_from (int): The base value to calculate offset of.
 
         Returns:
-            (int): EveryXMinutes with calculated offset.
+            (float): Minutes with calculated offset.
         """
-        calculatedXMinutes = int(everyXMinutesWithoutOffset - (
-                    everyXMinutesWithoutOffset * self._getStatusMessagesTimeOffsetPercentage() / 100))
+        calculated_value_with_offset = float(base_to_calulate_offset_from - (
+                    base_to_calulate_offset_from * self._getStatusMessagesTimeOffsetPercentage() / 100))
         # Avoid zero devision error.
-        if calculatedXMinutes == 0:
-            calculatedXMinutes = 1
+        if calculated_value_with_offset <= 0:
+            calculated_value_with_offset = 1
 
-        return int(calculatedXMinutes)
+        return float(calculated_value_with_offset)

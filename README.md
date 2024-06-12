@@ -7,11 +7,10 @@ To deploy use https://github.com/Sokrates1989/swarm-statechecker-server.git
 Stuff to do, that just could not be done in time
 - Server auth token
 - Timezone
-- Offset by sleeping in milliseconds instead of adjusting Modulo Divider
 - Logging
     - Log and print via telegram and email as well
     - Log more
-- print every: customize in settings and allow disabling0
+- print every: customize in settings and allow disabling
 - google drive folders as secret json instead of .env statechecker config json
 
 
