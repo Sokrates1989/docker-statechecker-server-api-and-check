@@ -20,10 +20,15 @@ import stateCheckItem as StateCheckItem
 # BackupCheckItem from own models to use location independent.
 import backupCheckItem as BackupCheckItem
 
+# Get environment variables.
+import configUtils as ConfigUtils
+configUtils = ConfigUtils.ConfigUtils()
+
 # StateCheckItem as pydantic model to use with fastAPI.
 # To unify usage, this model should be converted to StateCheckItem asap.
 # @see convertPydanticModelToStateCheckItem().
 class StateCheckItem_pydantic(BaseModel):
+    server_auth_token: str
     name: str
     description: Union[str, "None"] = "None"
     token: str
@@ -37,6 +42,7 @@ class StateCheckItem_pydantic(BaseModel):
 # To unify usage, this model should be converted to BackupCheckItem asap.
 # @see convertPydanticModelToBackupCheckItem().
 class BackupCheckItem_pydantic(BaseModel):
+    server_auth_token: str
     name: str
     description: Union[str, "None"] = "None"
     token: str
@@ -56,52 +62,69 @@ async def root_get():
 # Start checking the availability of a new tool or update the last time the tool has been available.
 @app.post("/v1/statecheck")
 async def statecheck(stateCheckItem_pydantic: StateCheckItem_pydantic, response: Response):
-    stateCheckItem = convertPydanticModelToStateCheckItem(stateCheckItem_pydantic)
-    dbWrapper = DatabaseWrapper.DatabaseWrapper()
-    stateCheckItem = dbWrapper.createOrUpdateStateCheck(stateCheckItem)
-    if stateCheckItem == None:
-        response.status_code = 401
-        return {"message": "invalid token"}
+    if is_server_authentication_token_valid(stateCheckItem_pydantic.server_auth_token):
+        stateCheckItem = convertPydanticModelToStateCheckItem(stateCheckItem_pydantic)
+        dbWrapper = DatabaseWrapper.DatabaseWrapper()
+        stateCheckItem = dbWrapper.createOrUpdateStateCheck(stateCheckItem)
+        if stateCheckItem == None:
+            response.status_code = 401
+            return {"message": "invalid tool token"}
+        else:
+            return 
     else:
-        return stateCheckItem
+        response.status_code = 401
+        return {"message": "invalid server authentication token"}
+
 
 # Stop checking the availablity of a watched tool.
 @app.post("/v1/statecheck/stop")
 async def stop_statecheck(stateCheckItem_pydantic: StateCheckItem_pydantic, response: Response):
-    stateCheckItem = convertPydanticModelToStateCheckItem(stateCheckItem_pydantic)
-    dbWrapper = DatabaseWrapper.DatabaseWrapper()
-    stateCheckItem = dbWrapper.stopStateCheck(stateCheckItem)
-    if stateCheckItem == None:
-        response.status_code = 401
-        return {"message": "invalid token"}
+    if is_server_authentication_token_valid(stateCheckItem_pydantic.server_auth_token):
+        stateCheckItem = convertPydanticModelToStateCheckItem(stateCheckItem_pydantic)
+        dbWrapper = DatabaseWrapper.DatabaseWrapper()
+        stateCheckItem = dbWrapper.stopStateCheck(stateCheckItem)
+        if stateCheckItem == None:
+            response.status_code = 401
+            return {"message": "invalid token"}
+        else:
+            return stateCheckItem
     else:
-        return stateCheckItem
+        response.status_code = 401
+        return {"message": "invalid server authentication token"}
 
 
 
 # Start checking a backup or update a backup check.
 @app.post("/v1/backupcheck")
 async def backupcheck(backupCheckItem_pydantic: BackupCheckItem_pydantic, response: Response):
-    backupCheckItem = convertPydanticModelToBackupCheckItem(backupCheckItem_pydantic)
-    dbWrapper = DatabaseWrapper.DatabaseWrapper()
-    backupCheckItem = dbWrapper.createOrUpdateBackupCheck(backupCheckItem)
-    if backupCheckItem == None:
-        response.status_code = 401
-        return {"message": "invalid token"}
+    if is_server_authentication_token_valid(backupCheckItem_pydantic.server_auth_token):
+        backupCheckItem = convertPydanticModelToBackupCheckItem(backupCheckItem_pydantic)
+        dbWrapper = DatabaseWrapper.DatabaseWrapper()
+        backupCheckItem = dbWrapper.createOrUpdateBackupCheck(backupCheckItem)
+        if backupCheckItem == None:
+            response.status_code = 401
+            return {"message": "invalid token"}
+        else:
+            return 
     else:
-        return backupCheckItem
+        response.status_code = 401
+        return {"message": "invalid server authentication token"}
 
 # Stop checking the availablity of a watched tool.
 @app.post("/v1/backupcheck/stop")
 async def stop_backupcheck(backupCheckItem_pydantic: BackupCheckItem_pydantic, response: Response):
-    backupCheckItem = convertPydanticModelToBackupCheckItem(backupCheckItem_pydantic)
-    dbWrapper = DatabaseWrapper.DatabaseWrapper()
-    backupCheckItem = dbWrapper.stopBackupCheck(backupCheckItem)
-    if backupCheckItem == None:
-        response.status_code = 401
-        return {"message": "invalid token"}
+    if is_server_authentication_token_valid(backupCheckItem_pydantic.server_auth_token):
+        backupCheckItem = convertPydanticModelToBackupCheckItem(backupCheckItem_pydantic)
+        dbWrapper = DatabaseWrapper.DatabaseWrapper()
+        backupCheckItem = dbWrapper.stopBackupCheck(backupCheckItem)
+        if backupCheckItem == None:
+            response.status_code = 401
+            return {"message": "invalid token"}
+        else:
+            return backupCheckItem
     else:
-        return backupCheckItem
+        response.status_code = 401
+        return {"message": "invalid server authentication token"}
 
 
 
@@ -147,3 +170,9 @@ def convertPydanticModelToBackupCheckItem(backupCheckItem_pydantic: BackupCheckI
         backupCheckItem_pydantic.description
         )
     return backupCheckItem
+
+
+
+# Is server authentication token valid?
+def is_server_authentication_token_valid(server_auth_token: str):
+    return configUtils.getServerAuthenticationToken() == server_auth_token

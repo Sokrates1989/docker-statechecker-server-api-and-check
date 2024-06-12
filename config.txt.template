@@ -1,4 +1,5 @@
 {
+	"serverAuthenticationToken": "RANDOM LONG STRING WITH SPECIAL CHARACTERS THAT MUST BE USED EVERY TIME TALKING TO THE API",
 	"toolsUsingApi_tolerancePeriod_inSeconds": "100",
 	"adminStatusMessage_operationTime_offsetPercentage":"3.4",
 	"database":
@@ -50,14 +51,14 @@
 				"name": "Google Drive Folder 1",
 				"description" : "",
 				"folderID": "googleDriveFolder_ID",
-				"token" : "RANDOM STRING TOKEN THAT MUST REMAIN THE SAME EVERY UPDATE",
+				"token" : "GOOGLE DRIVE TOKEN PROVIDED WHEN CREATING FOLDER ACCESS",
 				"stateCheckFrequency_inMinutes": 1500
 			},
 			{
 				"name": "Google Drive Folder 2",
 				"description" : "Description for Google Drive Folder 2",
 				"folderID": "googleDriveFolder_ID2",
-				"token" : "RANDOM STRING TOKEN THAT MUST REMAIN THE SAME EVERY UPDATE",
+				"token" : "GOOGLE DRIVE TOKEN PROVIDED WHEN CREATING FOLDER ACCESS",
 				"stateCheckFrequency_inMinutes": 1500
 			}
 			

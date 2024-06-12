@@ -673,3 +673,33 @@ class ConfigUtils:
 
         # Return the timezone object.
         return pytz.timezone(timezone)
+
+
+    
+
+    def getServerAuthenticationToken(self):
+        """
+        Get token required to talk to api.
+
+        Returns:
+            (str): Server authentication token.
+        """
+        server_auth_token=""
+        try:
+            SERVER_AUTHENTICATION_TOKEN_FILE = os.getenv("SERVER_AUTHENTICATION_TOKEN_FILE")
+            with open(f"{SERVER_AUTHENTICATION_TOKEN_FILE}", "r") as server_auth_token_file:
+                server_auth_token = server_auth_token_file.read().strip()
+        except:
+            pass
+        finally:
+            # In case of an error or the secret is not set.
+            if not server_auth_token or server_auth_token == "" or server_auth_token.lower() == "none":
+                server_auth_token = os.getenv('SERVER_AUTHENTICATION_TOKEN').strip().strip("\"")
+        if not server_auth_token or server_auth_token == "":
+            # Get PW from config.
+            server_auth_token = ""
+            if "serverAuthenticationToken" in self._config_array:
+                server_auth_token = self._config_array["serverAuthenticationToken"]
+                    
+        return server_auth_token
+    
