@@ -5,6 +5,8 @@ To deploy use https://github.com/Sokrates1989/swarm-statechecker-server.git
 
 # Backlog
 Stuff to do, that just could not be done in time
+- Email Make work with secret (Print/ Catch error of incorrect secret/ login)
+- Telegram Make work with secret (Print/ Catch error of incorrect secret/ login)
 - Logging
     - Log and print via telegram and email as well
     - Log more
