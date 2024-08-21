@@ -5,13 +5,20 @@ To deploy use https://github.com/Sokrates1989/swarm-statechecker-server.git
 
 # Backlog
 Stuff to do, that just could not be done in time
-- Email Make work with secret (Print/ Catch error of incorrect secret/ login)
-- Telegram Make work with secret (Print/ Catch error of incorrect secret/ login)
+- Latency Check (consider website or tool down, if latency is too high)
+    - Add config option to setup threshold (and whether to use latency check at all (implicitly off, if there is no threshold duration set or set to zero))
+    - Add measurement of duration between request and response
+    - Add different message (display threshold and actual latency, if down)
+    - Different status message every hour, to tell user, that latency check is dis- or enabled
+- Messaging
+    - Email Make work with secret (Print/ Catch error of incorrect secret/ login)
+    - Telegram Make work with secret (Print/ Catch error of incorrect secret/ login)
 - Logging
     - Log and print via telegram and email as well
     - Log more
-- print every: customize in settings and allow disabling
-- google drive folders as secret json instead of .env statechecker config json
+- Other
+    - print every: customize in settings and allow disabling
+    - google drive folders as secret json instead of .env statechecker config json
 
 
 # Push API to dockerhub
