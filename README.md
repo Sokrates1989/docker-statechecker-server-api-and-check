@@ -9,7 +9,7 @@ Stuff to do, that just could not be done in time
     - Add config option to setup threshold (and whether to use latency check at all (implicitly off, if there is no threshold duration set or set to zero))
     - Add measurement of duration between request and response
     - Add different message (display threshold and actual latency, if down)
-    - Different status message every hour, to tell user, that latency check is dis- or enabled
+    - Different status message every hour, to tell user, that latency check is dis- or enabled. Also display current latency.
 - Messaging
     - Email Make work with secret (Print/ Catch error of incorrect secret/ login)
     - Telegram Make work with secret (Print/ Catch error of incorrect secret/ login)
